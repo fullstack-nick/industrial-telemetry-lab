@@ -1,0 +1,97 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(processing_observations_total{outcome=\"rejected\"}[30m]))", "refId": "A"}],
+      "title": "Rejected (30 min)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "sum(increase(processing_observations_total{outcome=\"flagged\"}[30m]))", "refId": "A"}],
+      "title": "Flagged (30 min)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "increase(processing_duplicates_total[30m])", "refId": "A"}],
+      "title": "Duplicates suppressed (30 min)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "increase(processing_out_of_order_total[30m])", "refId": "A"}],
+      "title": "Out-of-order flags (30 min)",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"drawStyle": "bars", "fillOpacity": 45, "lineWidth": 1, "showPoints": "never", "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 0, "y": 5},
+      "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (outcome) (rate(processing_observations_total[5m]))", "legendFormat": "{{outcome}}", "refId": "A"}],
+      "title": "Quality decision rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "color": {"mode": "palette-classic"}}, "overrides": []},
+      "gridPos": {"h": 9, "w": 12, "x": 12, "y": 5},
+      "id": 6,
+      "options": {"displayLabels": ["name", "percent"], "legend": {"displayMode": "table", "placement": "right", "showLegend": true, "values": ["value", "percent"]}, "pieType": "donut", "reduceOptions": {"calcs": ["sum"], "fields": "", "values": false}, "tooltip": {"hideZeros": false, "mode": "single", "sort": "none"}},
+      "targets": [{"expr": "sum by (reason) (increase(processing_observations_total{outcome=\"rejected\"}[30m]))", "legendFormat": "{{reason}}", "refId": "A"}],
+      "title": "Rejection reasons",
+      "type": "piechart"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"drawStyle": "line", "fillOpacity": 20, "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
+      "id": 7,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "sum by (outcome) (rate(replay_observations_total[5m]))", "legendFormat": "replay {{outcome}}", "refId": "A"}],
+      "title": "Replay outcomes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
+      "id": 8,
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true},
+      "targets": [{"expr": "{job=\"industrial-telemetry-lab\"} |= \"rejected\"", "refId": "A"}],
+      "title": "Quality-related logs",
+      "type": "logs"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["portfolio", "telemetry", "quality"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timezone": "browser",
+  "title": "Data Quality",
+  "uid": "itl-data-quality",
+  "version": 1
+}

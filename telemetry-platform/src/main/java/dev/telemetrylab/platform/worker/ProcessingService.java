@@ -18,6 +18,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -28,6 +29,7 @@ import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -73,6 +75,7 @@ public class ProcessingService {
             .register(meterRegistry);
   }
 
+  @WithSpan("worker.raw_batch.process")
   public ProcessingCounts process(BatchReference reference) {
     Timer.Sample timer = Timer.start(meterRegistry);
     try {
@@ -97,6 +100,10 @@ public class ProcessingService {
                       reference, batch, mappingVersion, qualityRulesVersion, replayFrom, replayTo));
       meterRegistry.counter("processing_batches_total", "result", "success").increment();
       return Objects.requireNonNull(counts);
+    } catch (DataAccessException exception) {
+      meterRegistry.counter("processing_database_write_total", "result", "failure").increment();
+      meterRegistry.counter("processing_batches_total", "result", "failure").increment();
+      throw exception;
     } catch (RuntimeException exception) {
       meterRegistry.counter("processing_batches_total", "result", "failure").increment();
       throw exception;
@@ -146,6 +153,51 @@ public class ProcessingService {
     } catch (RuntimeException auditFailure) {
       LOGGER.warn(
           "Unable to record failed processing attempt; errorType={}",
+          auditFailure.getClass().getSimpleName());
+    }
+  }
+
+  public void recordTerminalFailure(BatchReference reference, RuntimeException error) {
+    if (reference == null || reference.batchId() == null) {
+      return;
+    }
+    try {
+      UUID batchId = UUID.fromString(reference.batchId());
+      UUID replayId = reference.replayId() == null ? null : UUID.fromString(reference.replayId());
+      String detail = truncate(error.toString());
+      if (replayId == null) {
+        jdbc.update(
+            """
+            UPDATE ingestion_batch SET processing_status='FAILED', last_error=?
+            WHERE batch_id=? AND processing_status <> 'PROCESSED'
+            """,
+            detail,
+            batchId);
+      } else {
+        transactions.executeWithoutResult(
+            status -> {
+              jdbc.update(
+                  """
+                  UPDATE replay_batch SET status='FAILED', last_error=?
+                  WHERE replay_id=? AND batch_id=?
+                  """,
+                  detail,
+                  replayId,
+                  batchId);
+              jdbc.update(
+                  """
+                  UPDATE replay_run SET status='FAILED', completed_at=?, last_error=?
+                  WHERE replay_id=? AND status IN ('PENDING', 'RUNNING')
+                  """,
+                  Timestamp.from(clock.instant()),
+                  detail,
+                  replayId);
+            });
+      }
+      meterRegistry.counter("processing_terminal_failures_total").increment();
+    } catch (RuntimeException auditFailure) {
+      LOGGER.warn(
+          "Unable to record terminal processing failure; errorType={}",
           auditFailure.getClass().getSimpleName());
     }
   }
@@ -371,18 +423,28 @@ public class ProcessingService {
   }
 
   private boolean isOutOfOrder(String facilityId, RawObservation observation) {
-    Long maximum =
+    SourcePosition maximum =
         jdbc.queryForObject(
             """
-            SELECT MAX(source_sequence) FROM telemetry_sample
+            SELECT MAX(source_sequence) AS maximum_sequence,
+                   MAX(observed_at) AS maximum_observed_at
+            FROM telemetry_sample
             WHERE facility_id=? AND source_system=? AND source_epoch=? AND source_tag=?
             """,
-            Long.class,
+            (result, row) ->
+                new SourcePosition(
+                    result.getObject("maximum_sequence", Long.class),
+                    result.getTimestamp("maximum_observed_at") == null
+                        ? null
+                        : result.getTimestamp("maximum_observed_at").toInstant()),
             facilityId,
             observation.sourceSystem(),
             observation.sourceEpoch(),
             observation.sourceTag());
-    return maximum != null && observation.sourceSequence() < maximum;
+    return maximum != null
+        && ((maximum.sequence() != null && observation.sourceSequence() < maximum.sequence())
+            || (maximum.observedAt() != null
+                && observation.observedAt().isBefore(maximum.observedAt())));
   }
 
   private Manifest lockManifest(UUID batchId) {
@@ -453,7 +515,7 @@ public class ProcessingService {
           rejected_count=s.rejected,
           duplicate_count=s.duplicate,
           status=CASE WHEN s.remaining=0 THEN 'COMPLETED' ELSE 'RUNNING' END,
-          completed_at=CASE WHEN s.remaining=0 THEN ? ELSE NULL END
+          completed_at=CASE WHEN s.remaining=0 THEN CAST(? AS TIMESTAMPTZ) ELSE NULL END
         FROM (
           SELECT replay_id,
                  COALESCE(SUM(processed_observation_count),0)::int AS processed,
@@ -464,7 +526,7 @@ public class ProcessingService {
                  COUNT(*) FILTER (WHERE status <> 'COMPLETED') AS remaining
           FROM replay_batch WHERE replay_id=? GROUP BY replay_id
         ) s
-        WHERE r.replay_id=s.replay_id
+        WHERE r.replay_id=s.replay_id AND r.status <> 'FAILED'
         """,
         Timestamp.from(completed),
         replayId);
@@ -547,6 +609,8 @@ public class ProcessingService {
 
   private record Manifest(
       Instant receivedAt, String processingStatus, int processingAttemptCount) {}
+
+  private record SourcePosition(Long sequence, Instant observedAt) {}
 
   public static final class ProcessingCounts {
     private int accepted;

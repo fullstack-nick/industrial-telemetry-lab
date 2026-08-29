@@ -12,7 +12,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Random;
@@ -47,8 +46,9 @@ public class ControllerHistory {
     this.properties = properties;
     this.clock = clock;
     this.random = new Random(properties.seed());
-    this.sourceEpoch =
-        UUID.nameUUIDFromBytes(("source-epoch-" + properties.seed()).getBytes()).toString();
+    // The epoch identifies one controller process lifetime. A new value on process restart lets
+    // durable collectors distinguish a reset sequence counter from a rewind of the same source.
+    this.sourceEpoch = UUID.randomUUID().toString();
     this.generated = meterRegistry.counter("controller_observations_generated_total");
     this.duplicated = meterRegistry.counter("controller_duplicate_observations_generated_total");
     Gauge.builder("controller_history_observations", history, Deque::size)
@@ -128,9 +128,6 @@ public class ControllerHistory {
           }
         }
       }
-      if (result.size() > 1 && random.nextDouble() < activeFaults.outOfOrderRate()) {
-        Collections.swap(result, result.size() - 1, result.size() - 2);
-      }
       long next =
           result.stream().mapToLong(ControllerReading::sequence).max().orElse(effectiveAfter);
       return new ControllerReadingsPage(sourceEpoch, next, result);
@@ -196,10 +193,14 @@ public class ControllerHistory {
       FaultSettings activeFaults) {
     long sequence = ++nextSequence;
     double noise = (random.nextDouble() - 0.5) * 0.3;
-    Instant effectiveTimestamp =
-        random.nextDouble() < activeFaults.futureTimestampRate()
-            ? observedAt.plus(Duration.ofMinutes(2))
-            : observedAt;
+    Instant effectiveTimestamp = observedAt;
+    if (random.nextDouble() < activeFaults.futureTimestampRate()) {
+      effectiveTimestamp = observedAt.plus(Duration.ofMinutes(2));
+    } else if (random.nextDouble() < activeFaults.outOfOrderRate()) {
+      // A late event keeps its monotonic source sequence but carries an older event timestamp.
+      // This models delayed controller delivery without violating the cursor protocol.
+      effectiveTimestamp = observedAt.minus(Duration.ofMinutes(10));
+    }
     String effectiveUnit =
         random.nextDouble() < activeFaults.invalidUnitRate() ? "invalid-unit" : nominalUnit;
     int qualityCode =

@@ -1,8 +1,11 @@
 package dev.telemetrylab.platform.gateway;
 
 import dev.telemetrylab.contracts.CollectorHeartbeat;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -19,9 +22,21 @@ class CollectorInventoryService {
   private final JdbcTemplate jdbc;
   private final Clock clock;
 
-  CollectorInventoryService(JdbcTemplate jdbc, Clock clock) {
+  CollectorInventoryService(JdbcTemplate jdbc, Clock clock, MeterRegistry meterRegistry) {
     this.jdbc = jdbc;
     this.clock = clock;
+    Gauge.builder(
+            "collector_last_heartbeat_age_seconds", this, CollectorInventoryService::heartbeatAge)
+        .description("Age of the most recent persisted collector heartbeat")
+        .register(meterRegistry);
+    Gauge.builder(
+            "collector_spool_observations", this, CollectorInventoryService::spoolObservations)
+        .description("Durable spool observations reported by all collectors")
+        .register(meterRegistry);
+    Gauge.builder(
+            "collector_oldest_unsent_age_seconds", this, CollectorInventoryService::oldestUnsentAge)
+        .description("Oldest unsent observation age reported by any collector")
+        .register(meterRegistry);
   }
 
   void heartbeat(String collectorId, CollectorHeartbeat heartbeat) {
@@ -100,5 +115,41 @@ class CollectorInventoryService {
           "No collector inventory record exists for " + collectorId);
     }
     return rows.getFirst();
+  }
+
+  private double heartbeatAge() {
+    try {
+      Timestamp last =
+          jdbc.queryForObject("SELECT MAX(last_heartbeat) FROM collector_status", Timestamp.class);
+      return last == null
+          ? Double.POSITIVE_INFINITY
+          : Math.max(0, Duration.between(last.toInstant(), clock.instant()).toSeconds());
+    } catch (RuntimeException exception) {
+      return Double.NaN;
+    }
+  }
+
+  private double spoolObservations() {
+    try {
+      Long count =
+          jdbc.queryForObject(
+              "SELECT COALESCE(SUM(spool_observation_count), 0) FROM collector_status", Long.class);
+      return count == null ? 0 : count;
+    } catch (RuntimeException exception) {
+      return Double.NaN;
+    }
+  }
+
+  private double oldestUnsentAge() {
+    try {
+      Long age =
+          jdbc.queryForObject(
+              "SELECT COALESCE(MAX(oldest_unsent_observation_age_seconds), 0) FROM"
+                  + " collector_status",
+              Long.class);
+      return age == null ? 0 : age;
+    } catch (RuntimeException exception) {
+      return Double.NaN;
+    }
   }
 }

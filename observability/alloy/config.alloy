@@ -1,0 +1,37 @@
+local.file_match "application_logs" {
+	path_targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/telemetry/*.json*",
+		job         = "industrial-telemetry-lab",
+	}]
+}
+
+loki.source.file "application_logs" {
+	targets    = local.file_match.application_logs.targets
+	forward_to = [loki.process.application_logs.receiver]
+}
+
+loki.process "application_logs" {
+	stage.json {
+		expressions = {
+			service = "service.name",
+			level   = "log.level",
+			traceId = "trace_id",
+		}
+	}
+
+	stage.labels {
+		values = {
+			service = "",
+			level   = "",
+		}
+	}
+
+	forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+}

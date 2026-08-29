@@ -10,6 +10,7 @@ import dev.telemetrylab.contracts.GzipCodec;
 import dev.telemetrylab.contracts.RawObservation;
 import dev.telemetrylab.contracts.RawObservationBatch;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
@@ -69,6 +70,7 @@ public class CollectorRepository {
         properties.sourceSystem());
   }
 
+  @WithSpan("collector.sqlite.persist_page")
   public synchronized int persistPage(ControllerReadingsPage page) {
     Integer inserted =
         transactions.execute(

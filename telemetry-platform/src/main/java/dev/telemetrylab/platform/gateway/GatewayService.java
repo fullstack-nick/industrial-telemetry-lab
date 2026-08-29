@@ -10,6 +10,7 @@ import dev.telemetrylab.platform.store.RawObjectStore;
 import dev.telemetrylab.platform.store.S3RawObjectStore.RawObjectConflictException;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -62,6 +63,7 @@ class GatewayService {
     this.meterRegistry = meterRegistry;
   }
 
+  @WithSpan("gateway.ingestion.accept")
   IngestionResult accept(ValidatedBatch batch, boolean failAfterRawWrite) {
     Timer.Sample timer = Timer.start(meterRegistry);
     try {
@@ -136,12 +138,17 @@ class GatewayService {
       String key = objectKey(batch);
       rawObjectStore.putIfAbsent(
           key, batch.compressedBytes(), batch.checksum(), batch.contentDigest());
+      meterRegistry.counter("raw_store_operations_total", "result", "success").increment();
       return key;
+    } catch (RuntimeException exception) {
+      meterRegistry.counter("raw_store_operations_total", "result", "failure").increment();
+      throw exception;
     } finally {
       timer.stop(meterRegistry.timer("ingestion_raw_store_duration_seconds"));
     }
   }
 
+  @WithSpan("gateway.manifest_and_outbox.transaction")
   private void insertManifestAndOutbox(ValidatedBatch batch, String objectKey) {
     List<Instant> timestamps =
         batch.contract().observations().stream().map(RawObservation::observedAt).sorted().toList();

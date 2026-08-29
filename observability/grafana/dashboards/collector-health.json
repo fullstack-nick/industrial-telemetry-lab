@@ -1,0 +1,94 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 0.6}, {"color": "red", "value": 0.8}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"minVizHeight": 75, "minVizWidth": 75, "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true, "sizing": "auto"},
+      "targets": [{"expr": "edge_spool_utilization_ratio", "refId": "A"}],
+      "title": "Durable spool utilization",
+      "type": "gauge"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1000}, {"color": "red", "value": 10000}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "edge_spool_observations", "refId": "A"}],
+      "title": "Unacknowledged observations",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 30}, {"color": "red", "value": 120}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "edge_oldest_unsent_age_seconds", "refId": "A"}],
+      "title": "Oldest unsent observation",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"mappings": [{"options": {"0": {"color": "green", "text": "CONTIGUOUS"}, "1": {"color": "red", "text": "GAP DETECTED"}}, "type": "value"}], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 6, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "edge_source_data_gap", "refId": "A"}],
+      "title": "Source continuity",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never", "stacking": {"group": "A", "mode": "none"}}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 6},
+      "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum by (result) (rate(edge_source_poll_total[5m]))", "legendFormat": "poll {{result}}", "refId": "A"},
+        {"expr": "sum(rate(edge_source_observations_received_total[5m]))", "legendFormat": "observations/s", "refId": "B"}
+      ],
+      "title": "Source acquisition",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never", "stacking": {"group": "A", "mode": "none"}}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 6},
+      "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum by (result) (rate(edge_upload_total[5m]))", "legendFormat": "uploads {{result}}/s", "refId": "A"},
+        {"expr": "sum(rate(edge_upload_retry_total[5m]))", "legendFormat": "retries/s", "refId": "B"}
+      ],
+      "title": "Gateway delivery",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "dateTimeAsIso", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 24, "x": 0, "y": 14},
+      "id": 7,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "center", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "targets": [{"expr": "edge_last_successful_upload_timestamp * 1000", "refId": "A"}],
+      "title": "Last durable gateway acknowledgment",
+      "type": "stat"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["portfolio", "telemetry", "collector"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timezone": "browser",
+  "title": "Collector Health",
+  "uid": "itl-collector-health",
+  "version": 1
+}

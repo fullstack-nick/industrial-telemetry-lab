@@ -8,6 +8,7 @@ import dev.telemetrylab.platform.worker.MappingCatalog.MappingResult;
 import dev.telemetrylab.platform.worker.MappingCatalog.UnknownSourceTagException;
 import dev.telemetrylab.platform.worker.QualityCatalog.QualityRules;
 import dev.telemetrylab.platform.worker.QualityCatalog.ValueRange;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ public class ObservationEvaluator {
     this.qualityCatalog = qualityCatalog;
   }
 
+  @WithSpan("worker.mapping_and_quality.evaluate")
   public ObservationDecision evaluate(
       RawObservation observation,
       String mappingVersion,

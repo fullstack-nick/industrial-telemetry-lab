@@ -55,17 +55,15 @@ class TelemetryWorker {
       int nextAttempt = currentAttempt + 1;
       processingService.recordFailure(reference, nextAttempt, processingFailure);
       try {
+        boolean terminal = nextAttempt >= MAXIMUM_ATTEMPTS;
         Map<String, Object> headers = copyTraceHeaders(message);
         headers.put("x-processing-attempt", nextAttempt);
-        String routing =
-            nextAttempt >= MAXIMUM_ATTEMPTS
-                ? RabbitTopology.DEAD_LETTER
-                : retryRouting(nextAttempt);
-        String exchange =
-            nextAttempt >= MAXIMUM_ATTEMPTS
-                ? RabbitTopology.DEAD_LETTER_EXCHANGE
-                : RabbitTopology.EXCHANGE;
+        String routing = terminal ? RabbitTopology.DEAD_LETTER : retryRouting(nextAttempt);
+        String exchange = terminal ? RabbitTopology.DEAD_LETTER_EXCHANGE : RabbitTopology.EXCHANGE;
         publisher.publishTo(exchange, routing, json, headers, Duration.ofSeconds(10));
+        if (terminal) {
+          processingService.recordTerminalFailure(reference, processingFailure);
+        }
         channel.basicAck(deliveryTag, false);
         LOGGER.warn(
             "Processing failed; reference republished safely; batchId={} attempt={} destination={}"

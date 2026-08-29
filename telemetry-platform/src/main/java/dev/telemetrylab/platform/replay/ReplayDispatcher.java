@@ -6,6 +6,7 @@ import dev.telemetrylab.contracts.BatchReference;
 import dev.telemetrylab.platform.messaging.ConfirmedPublisher;
 import dev.telemetrylab.platform.messaging.RabbitTopology;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -51,6 +52,7 @@ class ReplayDispatcher {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.replay.dispatch-delay-ms:100}")
+  @WithSpan("gateway.replay.dispatch")
   void dispatchNext() {
     transactions.executeWithoutResult(
         status -> {

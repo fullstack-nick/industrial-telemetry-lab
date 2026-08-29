@@ -2,6 +2,7 @@ package dev.telemetrylab.platform.store;
 
 import dev.telemetrylab.platform.PlatformProperties;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +39,7 @@ public class S3RawObjectStore implements RawObjectStore {
   }
 
   @Override
+  @WithSpan("raw_object_store.put_if_absent")
   public PutResult putIfAbsent(
       String objectKey, byte[] content, String checksum, String contentDigest) {
     ensureBucket();
@@ -69,6 +71,7 @@ public class S3RawObjectStore implements RawObjectStore {
   }
 
   @Override
+  @WithSpan("raw_object_store.get")
   public RawObject get(String objectKey) {
     ensureBucket();
     StoredObjectMetadata metadata =

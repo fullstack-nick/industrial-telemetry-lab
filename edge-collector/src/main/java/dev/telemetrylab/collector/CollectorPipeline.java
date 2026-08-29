@@ -7,6 +7,7 @@ import dev.telemetrylab.contracts.CursorGone;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import jakarta.annotation.PostConstruct;
 import java.time.Clock;
 import java.time.Duration;
@@ -71,6 +72,7 @@ public class CollectorPipeline {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.collector.poll-delay-ms:1000}")
+  @WithSpan("collector.source.poll")
   public void pollSource() {
     CollectorState state = repository.state();
     if (state.gapDetected()) {
@@ -125,6 +127,7 @@ public class CollectorPipeline {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.collector.batch-delay-ms:500}")
+  @WithSpan("collector.sqlite.create_batch")
   public void createOutboundBatch() {
     try {
       repository
@@ -143,6 +146,7 @@ public class CollectorPipeline {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.collector.upload-delay-ms:300}")
+  @WithSpan("collector.batch.upload")
   public void uploadNextBatch() {
     Optional<OutboundBatch> candidate = repository.claimNextUpload();
     if (candidate.isEmpty()) {
@@ -238,6 +242,7 @@ public class CollectorPipeline {
 
   public void recoverGap(String sourceEpoch, long cursor) {
     repository.recoverGap(sourceEpoch, cursor);
+    gapCount.set(0);
   }
 
   private void handleCursorGone(HttpClientErrorException.Gone exception) {

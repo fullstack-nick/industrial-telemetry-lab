@@ -2,6 +2,7 @@ package dev.telemetrylab.platform.messaging;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,6 +50,7 @@ class OutboxPublisher {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.outbox.publish-delay-ms:250}")
+  @WithSpan("gateway.outbox.publish")
   void publishNext() {
     transactions.executeWithoutResult(
         status -> {

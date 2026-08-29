@@ -1,0 +1,101 @@
+groups:
+  - name: industrial-telemetry-lab
+    rules:
+      - alert: CollectorOffline
+        expr: up{job="edge-collector"} == 0 or collector_last_heartbeat_age_seconds > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Edge collector is offline
+          runbook_url: docs/runbooks/collector-offline.md
+
+      - alert: CollectorSpoolBacklog
+        expr: edge_spool_utilization_ratio >= 0.8
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Collector durable spool has more than 1,000 observations
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: CollectorOldUnsentData
+        expr: edge_oldest_unsent_age_seconds > 300 or collector_oldest_unsent_age_seconds > 300
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Collector has retained unsent telemetry for more than five minutes
+          runbook_url: docs/runbooks/collector-offline.md
+
+      - alert: CollectorUploadFailures
+        expr: increase(edge_upload_total{result="failure"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Collector uploads are repeatedly failing
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: TransactionalOutboxBacklog
+        expr: outbox_unpublished_events > 10 or outbox_oldest_unpublished_age_seconds > 30
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Transactional outbox is not draining
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: WorkerQueueBacklog
+        expr: rabbitmq_queue_messages_ready{queue="telemetry.main"} > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Worker queue is accumulating unprocessed batches
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: ProcessingLagHigh
+        expr: histogram_quantile(0.99, sum by (le) (rate(processing_end_to_end_lag_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: P99 end-to-end processing lag exceeds 30 seconds
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: RejectionSpike
+        expr: sum(rate(processing_observations_total{outcome="rejected"}[5m])) / clamp_min(sum(rate(processing_observations_total[5m])), 1e-9) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than five percent of observations are being rejected
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: DeadLetterMessagesPresent
+        expr: rabbitmq_queue_messages{queue="telemetry.dead-letter"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: The dead-letter queue contains recoverable batch references
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: RawStoreOperationsFailing
+        expr: increase(raw_store_operations_total{result="failure"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Gateway operations are returning server errors; inspect raw storage and database
+          runbook_url: docs/runbooks/pipeline-backlog.md
+
+      - alert: DatabaseWritesFailing
+        expr: increase(processing_database_write_total{result="failure"}[5m]) > 3
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Batch processing is repeatedly failing; inspect database and raw storage
+          runbook_url: docs/runbooks/pipeline-backlog.md

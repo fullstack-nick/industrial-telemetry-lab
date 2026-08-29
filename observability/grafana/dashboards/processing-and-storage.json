@@ -1,0 +1,109 @@
+{
+  "annotations": {"list": []},
+  "editable": false,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 10}, {"color": "red", "value": 100}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "outbox_unpublished_events", "refId": "A"}],
+      "title": "Outbox pending",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 60}, {"color": "red", "value": 300}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 6, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "outbox_oldest_unpublished_age_seconds", "refId": "A"}],
+      "title": "Oldest outbox event",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 20}, {"color": "red", "value": 100}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 12, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "rabbitmq_queue_messages_ready{queue=\"telemetry.main\"}", "refId": "A"}],
+      "title": "Ready worker messages",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "gridPos": {"h": 5, "w": 6, "x": 18, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [{"expr": "rabbitmq_queue_messages{queue=\"telemetry.dead-letter\"}", "refId": "A"}],
+      "title": "Dead-letter messages",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"drawStyle": "line", "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5},
+      "id": 5,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum by (result) (rate(ingestion_batches_total[5m]))", "legendFormat": "ingestion {{result}}", "refId": "A"},
+        {"expr": "sum by (result) (rate(outbox_publish_total[5m]))", "legendFormat": "outbox {{result}}", "refId": "B"},
+        {"expr": "sum by (result) (rate(processing_batches_total[5m]))", "legendFormat": "processing {{result}}", "refId": "C"}
+      ],
+      "title": "Batch lifecycle rates",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "s", "custom": {"drawStyle": "line", "fillOpacity": 20, "lineInterpolation": "smooth", "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 5},
+      "id": 6,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum(rate(ingestion_request_duration_seconds_sum[5m])) / clamp_min(sum(rate(ingestion_request_duration_seconds_count[5m])), 1e-9)", "legendFormat": "gateway ingestion", "refId": "A"},
+        {"expr": "sum(rate(ingestion_raw_store_duration_seconds_sum[5m])) / clamp_min(sum(rate(ingestion_raw_store_duration_seconds_count[5m])), 1e-9)", "legendFormat": "raw object store", "refId": "B"},
+        {"expr": "sum(rate(processing_duration_seconds_sum[5m])) / clamp_min(sum(rate(processing_duration_seconds_count[5m])), 1e-9)", "legendFormat": "worker processing", "refId": "C"}
+      ],
+      "title": "Mean stage duration",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "bytes", "custom": {"drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never"}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 13},
+      "id": 7,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [{"expr": "rabbitmq_queue_messages_ram_bytes{queue=~\"telemetry.*\"}", "legendFormat": "{{queue}}", "refId": "A"}],
+      "title": "RabbitMQ queue memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"unit": "ops", "custom": {"drawStyle": "bars", "fillOpacity": 35, "lineWidth": 1, "showPoints": "never", "stacking": {"group": "A", "mode": "normal"}}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 13},
+      "id": 8,
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi", "sort": "desc"}},
+      "targets": [
+        {"expr": "sum by (result) (rate(processing_database_write_total[5m]))", "legendFormat": "database {{result}}", "refId": "A"},
+        {"expr": "sum(rate(ingestion_duplicate_batches_total[5m]))", "legendFormat": "idempotent batch duplicates", "refId": "B"}
+      ],
+      "title": "Persistence outcomes",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 41,
+  "tags": ["portfolio", "telemetry", "storage"],
+  "templating": {"list": []},
+  "time": {"from": "now-30m", "to": "now"},
+  "timezone": "browser",
+  "title": "Processing and Storage",
+  "uid": "itl-processing-storage",
+  "version": 1
+}
