@@ -1958,13 +1958,13 @@ This is a research snapshot, not permission to use floating tags. Revalidate it 
 | Logs | Loki 3.7.7 plus Grafana Alloy 1.19.2 | Alloy replaces obsolete log-shipping approaches |
 | Traces | Tempo 3.0.3 and OpenTelemetry Collector 0.159.0 | Export OTLP locally |
 | Java tracing | OpenTelemetry Java agent | Default zero-code instrumentation, extended with explicit spans only where useful |
-| Raw object storage | Decision required | The originally planned MinIO community repository is archived and unmaintained |
+| Raw object storage | SeaweedFS 4.44 in single-node S3 mode | Owner-selected replacement for the archived MinIO runtime |
 
 ## 30.1 Raw object-store research result
 
 The MinIO community repository was archived in April 2026 and now states that it is no longer maintained. Its last community server release was in October 2025, the community distribution became source-only, and its licensing requires an explicit compliance review. A new public portfolio project should not quietly depend on an archived server.
 
-The recommended replacement is **SeaweedFS 4.44 in single-node S3 mode**:
+The selected replacement is **SeaweedFS 4.44 in single-node S3 mode**:
 
 * It is actively maintained.
 * It exposes the small S3 subset required by RawObjectStore.
@@ -2252,7 +2252,7 @@ Capture README screenshots only after the demo scripts and dashboards are stable
 
 Before launching the end-to-end development goal:
 
-1. Resolve the three open decisions in section 36.
+1. Resolve the three owner decisions in section 36. **Completed on 2026-08-29.**
 2. Revalidate the provisional dependency versions and image availability once.
 3. Record image tags, digests, licenses, and source links.
 4. Confirm the public repository remote and default branch.
@@ -2267,31 +2267,31 @@ The end-to-end goal should not be marked complete until the original definition 
 
 ---
 
-# 36. Open decisions requiring owner input
+# 36. Resolved owner decisions
 
 ## P-01: Maintained local S3-compatible object store
 
-**Recommended:** Replace the archived MinIO runtime with SeaweedFS in single-node S3 mode while keeping the RawObjectStore abstraction and the raw-object behavior unchanged.
+**Status:** Resolved on 2026-08-29.
 
-**Alternative:** Keep MinIO only by building its final community source release and accepting the archived maintenance and licensing story.
+**Selected:** SeaweedFS in single-node S3 mode while keeping the RawObjectStore abstraction and raw-object behavior unchanged.
 
-This decision is required before Phase 1 Compose and ADR 010.
+All MinIO references in the preserved original plan are interpreted as the local raw-object-store role. Implementation-specific service names, health checks, console links, image references, tests, and documentation will use SeaweedFS. Contracts, object keys, checksums, manifests, replay behavior, and acknowledgment semantics are unchanged.
 
 ## P-02: Repository license
 
-**Recommended:** Apache License 2.0 because it is permissive and includes an explicit patent grant.
+**Status:** Resolved on 2026-08-29.
 
-**Alternative:** MIT for a shorter, very permissive license.
-
-Until selected, a public repository without a license remains all-rights-reserved by default. Select the license before the first code release.
+**Selected:** MIT License. The root LICENSE file records the selection.
 
 ## P-03: Explicitly neutral fictional setting
 
-**Recommended:** Approve the environmental qualification lab for empty equipment enclosures described in section 28.2. It preserves all twelve zones, signals, tags, APIs, and failure scenarios while making the public narrative clearly unrelated to biological or agricultural operations.
+**Status:** Resolved on 2026-08-29.
 
-**Alternative:** Keep the more abstract phrase climate-controlled industrial facility, with the same prohibited-domain boundary.
+**Selected:** Environmental qualification lab for empty equipment enclosures as described in section 28.2.
 
-No other owner decision currently blocks development. Framework version, SQL access style, cross-platform scripts, queue type, retry topology, pagination, limits, observability transport, and local security all have recommended defaults above and can be changed later through ADRs.
+This is a narrative boundary only. It preserves all twelve zones, signals, source tags, schemas, fields, mappings, APIs, databases, metrics, dashboards, replay behavior, and failure scenarios in the original plan.
+
+No owner decision remains open or blocks development. Framework version, SQL access style, cross-platform scripts, queue type, retry topology, pagination, limits, observability transport, and local security all have accepted defaults above and can be changed later through ADRs.
 
 ---
 
