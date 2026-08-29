@@ -2057,8 +2057,7 @@ Store trace context with the outbox record and inject it into RabbitMQ headers s
 
 The original topology lists two retry queues but describes three retry delays. Add:
 
-text
-telemetry.retry.long
+    telemetry.retry.long
 
 Use the explicit short, medium, and long retry queues in the first implementation because they are easy to inspect during the demo. Do not combine them with a second hidden retry mechanism.
 
@@ -2079,11 +2078,10 @@ The single-node deployment demonstrates message semantics, not broker high avail
 
 Apply the collector schema with Flyway and configure SQLite with:
 
-text
-PRAGMA journal_mode=WAL;
-PRAGMA synchronous=FULL;
-PRAGMA foreign_keys=ON;
-PRAGMA busy_timeout=5000;
+    PRAGMA journal_mode=WAL;
+    PRAGMA synchronous=FULL;
+    PRAGMA foreign_keys=ON;
+    PRAGMA busy_timeout=5000;
 
 Use one serialized writer path. Keep transactions short and retry SQLITE_BUSY with a bounded policy. The SQLite database, WAL file, and shared-memory file must live together on one Docker named volume; do not place the live spool on a network filesystem.
 
@@ -2160,22 +2158,21 @@ Provide a normal stop command that preserves volumes and an explicitly destructi
 
 Extend the proposed structure with:
 
-text
-.mvn/wrapper/
-telemetry-contracts/
-observability/alloy/
-scripts/check-prerequisites.sh
-scripts/check-prerequisites.ps1
-scripts/verify-local.ps1
-scripts/run-end-to-end-tests.ps1
-scripts/run-demo.ps1
-scripts/scenarios/*.ps1
-docs/dependency-baseline.md
-docs/demo/
-docs/adrs/008-concurrent-batch-receipt.md
-docs/adrs/009-global-observation-deduplication.md
-docs/adrs/010-local-object-store-selection.md
-docs/adrs/011-local-security-boundary.md
+    .mvn/wrapper/
+    telemetry-contracts/
+    observability/alloy/
+    scripts/check-prerequisites.sh
+    scripts/check-prerequisites.ps1
+    scripts/verify-local.ps1
+    scripts/run-end-to-end-tests.ps1
+    scripts/run-demo.ps1
+    scripts/scenarios/*.ps1
+    docs/dependency-baseline.md
+    docs/demo/
+    docs/adrs/008-concurrent-batch-receipt.md
+    docs/adrs/009-global-observation-deduplication.md
+    docs/adrs/010-local-object-store-selection.md
+    docs/adrs/011-local-security-boundary.md
 
 telemetry-contracts is a small Java module containing contract DTOs, schema loading, deterministic serialization, digest utilities, and shared reason-code enums. It must not contain service logic, database entities, or vendor clients.
 
