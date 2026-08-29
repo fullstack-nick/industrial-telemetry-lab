@@ -1,0 +1,9 @@
+qualityRulesVersion: quality-rules-1.0.0
+futureTimestampFlagSeconds: 5
+futureTimestampRejectSeconds: 300
+lateArrivalFlagSeconds: 300
+goodSourceQualityCode: 192
+ranges:
+  environment.air_temperature: {minimum: -40.0, maximum: 125.0}
+  environment.relative_humidity: {minimum: 0.0, maximum: 100.0}
+  ventilation.output: {minimum: 0.0, maximum: 100.0}

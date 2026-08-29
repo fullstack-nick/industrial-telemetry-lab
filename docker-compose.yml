@@ -1,0 +1,272 @@
+name: industrial-telemetry-lab
+
+x-application-common: &application-common
+  restart: unless-stopped
+  read_only: true
+  tmpfs:
+    - /tmp:size=128m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  environment: &application-environment
+    LOCAL_DEVELOPMENT_TOKEN: ${LOCAL_API_TOKEN}
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+    OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    OTEL_METRICS_EXPORTER: none
+    OTEL_LOGS_EXPORTER: none
+    OTEL_PROPAGATORS: tracecontext,baggage
+    OTEL_RESOURCE_ATTRIBUTES: service.namespace=industrial-telemetry-lab,deployment.environment=local
+  volumes:
+    - application_logs:/var/log/telemetry
+  networks:
+    - telemetry
+
+services:
+  storage-init:
+    image: eclipse-temurin:21.0.8_9-jre-jammy
+    restart: no
+    read_only: true
+    network_mode: none
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+    command: [chown, -R, "10001:10001", /data, /logs]
+    volumes:
+      - collector_data:/data
+      - application_logs:/logs
+
+  timescaledb:
+    image: timescale/timescaledb:2.29.2-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - 127.0.0.1:5432:5432
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - telemetry
+
+  rabbitmq:
+    image: rabbitmq:4.3.5-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - 127.0.0.1:5672:5672
+      - 127.0.0.1:15672:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [CMD, rabbitmq-diagnostics, -q, ping]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks:
+      - telemetry
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.44
+    restart: unless-stopped
+    command: [mini, -dir=/data]
+    environment:
+      AWS_ACCESS_KEY_ID: ${OBJECT_STORE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${OBJECT_STORE_SECRET_KEY}
+      S3_BUCKET: ${OBJECT_STORE_BUCKET}
+    ports:
+      - 127.0.0.1:8333:8333
+      - 127.0.0.1:8888:8888
+      - 127.0.0.1:9333:9333
+    volumes:
+      - seaweedfs_data:/data
+    healthcheck:
+      test: [CMD-SHELL, "wget -q -O /dev/null http://localhost:9333/cluster/status || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    networks:
+      - telemetry
+
+  database-migrate:
+    <<: *application-common
+    restart: no
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        MODULE: telemetry-platform
+    environment:
+      <<: *application-environment
+      APP_MODE: migrate
+      SERVICE_NAME: database-migrate
+      SPRING_MAIN_WEB_APPLICATION_TYPE: none
+      DATABASE_URL: jdbc:postgresql://timescaledb:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      RAW_STORE_ENDPOINT: http://seaweedfs:8333
+      RAW_STORE_ACCESS_KEY: ${OBJECT_STORE_ACCESS_KEY}
+      RAW_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      RAW_STORE_BUCKET: ${OBJECT_STORE_BUCKET}
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      timescaledb:
+        condition: service_healthy
+
+  telemetry-gateway:
+    <<: *application-common
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        MODULE: telemetry-platform
+    environment:
+      <<: *application-environment
+      APP_MODE: gateway
+      SERVICE_NAME: telemetry-gateway
+      SERVER_PORT: 8080
+      FLYWAY_ENABLED: "false"
+      DATABASE_URL: jdbc:postgresql://timescaledb:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RAW_STORE_ENDPOINT: http://seaweedfs:8333
+      RAW_STORE_ACCESS_KEY: ${OBJECT_STORE_ACCESS_KEY}
+      RAW_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      RAW_STORE_BUCKET: ${OBJECT_STORE_BUCKET}
+      OTEL_SERVICE_NAME: telemetry-gateway
+      FAILURE_INJECTION_ENABLED: "true"
+    ports:
+      - 127.0.0.1:8080:8080
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      database-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8080/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  telemetry-worker:
+    <<: *application-common
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        MODULE: telemetry-platform
+    environment:
+      <<: *application-environment
+      APP_MODE: worker
+      SERVICE_NAME: telemetry-worker
+      SERVER_PORT: 8083
+      FLYWAY_ENABLED: "false"
+      DATABASE_URL: jdbc:postgresql://timescaledb:5432/${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RAW_STORE_ENDPOINT: http://seaweedfs:8333
+      RAW_STORE_ACCESS_KEY: ${OBJECT_STORE_ACCESS_KEY}
+      RAW_STORE_SECRET_KEY: ${OBJECT_STORE_SECRET_KEY}
+      RAW_STORE_BUCKET: ${OBJECT_STORE_BUCKET}
+      OTEL_SERVICE_NAME: telemetry-worker
+    ports:
+      - 127.0.0.1:8083:8083
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      database-migrate:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+      seaweedfs:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8083/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  controller-simulator:
+    <<: *application-common
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        MODULE: controller-simulator
+    environment:
+      <<: *application-environment
+      SERVER_PORT: 8081
+      SIMULATOR_SEED: ${SIMULATOR_RANDOM_SEED}
+      OTEL_SERVICE_NAME: controller-simulator
+    ports:
+      - 127.0.0.1:8081:8081
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8081/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  edge-collector:
+    <<: *application-common
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      args:
+        MODULE: edge-collector
+    environment:
+      <<: *application-environment
+      SERVER_PORT: 8082
+      COLLECTOR_DB_PATH: /data/collector.db
+      JAVA_TOOL_OPTIONS: -Dorg.sqlite.tmpdir=/data
+      SOURCE_URL: http://controller-simulator:8081
+      GATEWAY_URL: http://telemetry-gateway:8080
+      OTEL_SERVICE_NAME: edge-collector
+    ports:
+      - 127.0.0.1:8082:8082
+    volumes:
+      - application_logs:/var/log/telemetry
+      - collector_data:/data
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      controller-simulator:
+        condition: service_healthy
+      telemetry-gateway:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, curl, -fsS, http://localhost:8082/actuator/health/readiness]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+networks:
+  telemetry:
+    name: industrial-telemetry-lab
+
+volumes:
+  application_logs:
+  collector_data:
+  rabbitmq_data:
+  seaweedfs_data:
+  timescaledb_data:

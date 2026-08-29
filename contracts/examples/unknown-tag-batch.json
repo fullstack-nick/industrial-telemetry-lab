@@ -1,0 +1,20 @@
+{
+  "contractVersion": "raw-observation.batch.v1",
+  "batchId": "4f4b4af1-bf5c-4464-af77-65b499c0101d",
+  "collectorId": "edge-gateway-01",
+  "collectorVersion": "1.0.0",
+  "facilityId": "facility-alpha",
+  "createdAt": "2026-08-29T08:41:25Z",
+  "observations": [
+    {
+      "sourceSystem": "controller-a",
+      "sourceEpoch": "47af63a8-85c4-4a34-9b60-f63d6e16f564",
+      "sourceSequence": 184203,
+      "sourceTag": "CTRL_A.ZONE[07].TEMP_AUX_PV",
+      "observedAt": "2026-08-29T08:41:20.217Z",
+      "rawValue": 29.1,
+      "rawUnit": "degC",
+      "sourceQualityCode": 192
+    }
+  ]
+}

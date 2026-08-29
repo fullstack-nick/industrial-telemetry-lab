@@ -1,0 +1,20 @@
+registryVersion: signal-registry-1.0.0
+signals:
+  - signalId: environment.air_temperature
+    displayName: Enclosure air temperature
+    unit: Cel
+    valueType: double
+    minimum: -40.0
+    maximum: 125.0
+  - signalId: environment.relative_humidity
+    displayName: Enclosure relative humidity
+    unit: "%"
+    valueType: double
+    minimum: 0.0
+    maximum: 100.0
+  - signalId: ventilation.output
+    displayName: Ventilation output
+    unit: "%"
+    valueType: double
+    minimum: 0.0
+    maximum: 100.0

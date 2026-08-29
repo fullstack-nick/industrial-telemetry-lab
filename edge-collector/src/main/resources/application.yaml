@@ -1,0 +1,74 @@
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+
+spring:
+  application:
+    name: edge-collector
+  datasource:
+    url: jdbc:sqlite:${COLLECTOR_DB_PATH:./data/collector.db}?journal_mode=WAL&synchronous=FULL&foreign_keys=on&busy_timeout=5000
+    driver-class-name: org.sqlite.JDBC
+    hikari:
+      maximum-pool-size: 1
+      minimum-idle: 1
+      connection-test-query: SELECT 1
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  task:
+    scheduling:
+      pool:
+        size: 4
+
+telemetry:
+  collector:
+    collector-id: ${COLLECTOR_ID:edge-gateway-01}
+    collector-version: 1.0.0
+    configuration-version: facility-alpha-config-1.0.0
+    source-adapter-version: http-controller-adapter-1.0.0
+    facility-id: ${FACILITY_ID:facility-alpha}
+    source-system: controller-a
+    source-url: ${SOURCE_URL:http://localhost:8081}
+    gateway-url: ${GATEWAY_URL:http://localhost:8080}
+    local-token: ${LOCAL_DEVELOPMENT_TOKEN:replace-this-local-token}
+    poll-limit: 500
+    batch-size: 500
+    batch-maximum-age: 5s
+    spool-max-rows: ${SPOOL_MAX_ROWS:100000}
+    high-watermark-percent: 80
+    low-watermark-percent: 60
+    acknowledged-retention: 15m
+    poll-delay-ms: 1000
+    batch-delay-ms: 500
+    upload-delay-ms: 300
+    heartbeat-delay-ms: 30000
+    heartbeat-initial-delay-ms: 3000
+    prune-delay-ms: 60000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service: edge-collector
+
+logging:
+  structured:
+    format:
+      console: ecs
+      file: ecs
+  file:
+    name: ${LOG_FILE:/var/log/telemetry/edge-collector.json}
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 5
+      total-size-cap: 50MB

@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://industrial-telemetry-lab.local/contracts/telemetry.sample.v1.schema.json",
+  "title": "Canonical telemetry sample v1",
+  "type": "object",
+  "required": [
+    "contractVersion",
+    "observationId",
+    "facilityId",
+    "assetId",
+    "signalId",
+    "observedAt",
+    "receivedAt",
+    "processedAt",
+    "value",
+    "unit",
+    "quality",
+    "flags",
+    "source"
+  ],
+  "properties": {
+    "contractVersion": {"const": "telemetry.sample.v1"},
+    "observationId": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "facilityId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "assetId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "signalId": {"type": "string", "minLength": 1, "maxLength": 128},
+    "observedAt": {"type": "string", "format": "date-time"},
+    "receivedAt": {"type": "string", "format": "date-time"},
+    "processedAt": {"type": "string", "format": "date-time"},
+    "value": {"type": "number"},
+    "unit": {"type": "string"},
+    "quality": {"enum": ["GOOD", "BAD"]},
+    "flags": {"type": "array", "items": {"type": "string"}},
+    "source": {
+      "type": "object",
+      "required": [
+        "sourceSystem",
+        "sourceEpoch",
+        "sourceSequence",
+        "sourceTag",
+        "collectorId",
+        "collectorVersion",
+        "mappingVersion",
+        "qualityRulesVersion"
+      ],
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

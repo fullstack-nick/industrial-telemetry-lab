@@ -1,0 +1,36 @@
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+
+# Java and Maven
+target/
+**/target/
+.mvn/timing.properties
+dependency-reduced-pom.xml
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Runtime state
+data/
+logs/
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# Test and report output
+artifacts/
+reports/
+dependency-check-data/
+
+# Operating systems
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Local Codex metadata
+.codex/

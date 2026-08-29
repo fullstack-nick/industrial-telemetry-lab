@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://industrial-telemetry-lab.local/contracts/raw-observation.batch.v1.schema.json",
+  "title": "Raw observation batch v1",
+  "type": "object",
+  "required": [
+    "contractVersion",
+    "batchId",
+    "collectorId",
+    "collectorVersion",
+    "facilityId",
+    "createdAt",
+    "observations"
+  ],
+  "properties": {
+    "contractVersion": {"const": "raw-observation.batch.v1"},
+    "batchId": {"type": "string", "format": "uuid"},
+    "collectorId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "collectorVersion": {"type": "string", "minLength": 1, "maxLength": 64},
+    "facilityId": {"type": "string", "minLength": 1, "maxLength": 64},
+    "createdAt": {"type": "string", "format": "date-time"},
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {"$ref": "#/$defs/rawObservation"}
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "rawObservation": {
+      "type": "object",
+      "required": [
+        "sourceSystem",
+        "sourceEpoch",
+        "sourceSequence",
+        "sourceTag",
+        "observedAt",
+        "rawValue",
+        "rawUnit",
+        "sourceQualityCode"
+      ],
+      "properties": {
+        "sourceSystem": {"type": "string", "minLength": 1, "maxLength": 64},
+        "sourceEpoch": {"type": "string", "format": "uuid"},
+        "sourceSequence": {"type": "integer", "minimum": 0},
+        "sourceTag": {"type": "string", "minLength": 1, "maxLength": 256},
+        "observedAt": {"type": "string", "format": "date-time"},
+        "rawValue": {"type": "number"},
+        "rawUnit": {"type": "string", "minLength": 1, "maxLength": 32},
+        "sourceQualityCode": {"type": "integer"}
+      },
+      "additionalProperties": true
+    }
+  }
+}

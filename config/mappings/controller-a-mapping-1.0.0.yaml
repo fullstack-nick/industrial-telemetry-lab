@@ -1,0 +1,17 @@
+mappingVersion: controller-a-mapping-1.0.0
+rules:
+  - tagPattern: 'CTRL_A\.ZONE\[(?<zone>\d{2})\]\.TEMP_PV'
+    assetIdTemplate: 'zone-${zone}'
+    signalId: environment.air_temperature
+    expectedSourceUnit: degC
+    canonicalUnit: Cel
+  - tagPattern: 'CTRL_A\.ZONE\[(?<zone>\d{2})\]\.RH_PV'
+    assetIdTemplate: 'zone-${zone}'
+    signalId: environment.relative_humidity
+    expectedSourceUnit: "%"
+    canonicalUnit: "%"
+  - tagPattern: 'CTRL_A\.ZONE\[(?<zone>\d{2})\]\.FAN_OUT'
+    assetIdTemplate: 'zone-${zone}'
+    signalId: ventilation.output
+    expectedSourceUnit: "%"
+    canonicalUnit: "%"

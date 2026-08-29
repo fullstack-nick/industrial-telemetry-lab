@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.vscode
+.env
+**/target
+artifacts
+data
+dependency-check-data
+logs
+reports
+PROJECT_PLAN.md
