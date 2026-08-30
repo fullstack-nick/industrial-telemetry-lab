@@ -288,12 +288,20 @@
             <groupId>org.cyclonedx</groupId>
             <artifactId>cyclonedx-maven-plugin</artifactId>
             <version>${cyclonedx.version}</version>
+            <inherited>false</inherited>
             <executions>
               <execution>
+                <id>release-aggregate-bom</id>
                 <goals>
                   <goal>makeAggregateBom</goal>
                 </goals>
                 <phase>verify</phase>
+                <configuration>
+                  <outputDirectory>${project.build.directory}</outputDirectory>
+                  <outputFormat>json</outputFormat>
+                  <outputName>bom</outputName>
+                  <schemaVersion>1.6</schemaVersion>
+                </configuration>
               </execution>
             </executions>
           </plugin>
@@ -311,6 +319,7 @@
             <configuration>
               <failBuildOnCVSS>7</failBuildOnCVSS>
               <dataDirectory>${maven.multiModuleProjectDirectory}/dependency-check-data</dataDirectory>
+              <nvdApiKeyEnvironmentVariable>NVD_API_KEY</nvdApiKeyEnvironmentVariable>
             </configuration>
             <executions>
               <execution>

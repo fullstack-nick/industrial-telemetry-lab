@@ -1,4 +1,4 @@
-FROM maven:3.9.16-eclipse-temurin-21 AS build
+FROM maven:3.9.16-eclipse-temurin-21@sha256:8f6ac126f7810bb5549c4cd122d2bf0e9cda5bdeb0838aa928f09e779fd8bef8 AS build
 
 ARG MODULE
 WORKDIR /workspace
@@ -19,9 +19,9 @@ COPY edge-collector edge-collector
 COPY telemetry-platform telemetry-platform
 RUN ./mvnw --no-transfer-progress -pl "${MODULE}" -am package -DskipTests
 
-FROM otel/autoinstrumentation-java:2.28.1 AS otel-agent
+FROM otel/autoinstrumentation-java:2.28.1@sha256:41b92978e61d13d4f32c6eb20c6ae7821a73ffdec8539bc6a73858e884b411d8 AS otel-agent
 
-FROM eclipse-temurin:21.0.8_9-jre-jammy
+FROM eclipse-temurin:21.0.8_9-jre-jammy@sha256:db1689535962d757a5adabf57387584ed543d38c0b9d1fe870123ea362ad73b0
 
 ARG MODULE
 RUN apt-get update \

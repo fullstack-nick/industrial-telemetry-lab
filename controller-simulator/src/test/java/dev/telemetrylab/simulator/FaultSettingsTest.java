@@ -46,4 +46,26 @@ class FaultSettingsTest {
     assertThat(page.readings())
         .allSatisfy(reading -> assertThat(reading.observedAt()).isEqualTo(now.minusSeconds(600)));
   }
+
+  @Test
+  void expiredCursorReturnsTheRetainedSequenceBoundaryWithoutSkipping() {
+    ControllerHistory history =
+        new ControllerHistory(
+            new SimulatorProperties(7, 40, 5000, "token", "controller-a"),
+            Clock.fixed(Instant.parse("2026-08-29T12:00:00Z"), ZoneOffset.UTC),
+            new SimpleMeterRegistry());
+    history.generateReadings();
+    String epoch = history.read(null, 0, 1).sourceEpoch();
+    history.generateReadings();
+
+    assertThatThrownBy(() -> history.read(epoch, 1, 500))
+        .isInstanceOf(CursorExpiredException.class)
+        .satisfies(
+            error -> {
+              CursorExpiredException expired = (CursorExpiredException) error;
+              assertThat(expired.detail().sourceEpoch()).isEqualTo(epoch);
+              assertThat(expired.detail().earliestSequence()).isGreaterThan(2);
+              assertThat(expired.detail().latestSequence()).isEqualTo(72);
+            });
+  }
 }

@@ -10,6 +10,7 @@ try {
     Wait-CoreStack
     $scenarios = @(
         "normal-operation",
+        "ingestion-boundaries",
         "gateway-outage",
         "collector-restart",
         "worker-backlog",
@@ -22,7 +23,7 @@ try {
         & (Join-Path $PSScriptRoot "scenarios/$scenario.ps1") -EnvFile $script:TelemetryEnvFile
         if (-not $?) { throw "Scenario failed: $scenario" }
     }
-    Write-Host "All eight end-to-end scenarios passed." -ForegroundColor Green
+    Write-Host "All nine end-to-end scenarios passed." -ForegroundColor Green
 } finally {
     try { Reset-SimulatorFaults } catch {}
     try { Invoke-TelemetryCompose @("start", "timescaledb", "rabbitmq", "seaweedfs", "controller-simulator", "telemetry-gateway", "telemetry-worker", "edge-collector") } catch {}

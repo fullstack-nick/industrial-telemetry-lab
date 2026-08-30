@@ -61,6 +61,34 @@ class CollectorDurabilityTest {
     assertThat(filesExist(temporaryDirectory)).contains("collector.db");
   }
 
+  @Test
+  void aVisibleGapRequiresExplicitRecoveryAndDoesNotAdvanceTheCursor() {
+    SQLiteDataSource dataSource = new SQLiteDataSource();
+    dataSource.setUrl(
+        "jdbc:sqlite:"
+            + temporaryDirectory.resolve("gap.db")
+            + "?journal_mode=WAL&synchronous=FULL&foreign_keys=on&busy_timeout=5000");
+    Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
+    JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+    CollectorRepository repository =
+        new CollectorRepository(
+            jdbc,
+            new TransactionTemplate(new DataSourceTransactionManager(dataSource)),
+            ContractObjectMapper.create(),
+            properties(),
+            Clock.fixed(Instant.parse("2026-08-29T10:00:00Z"), ZoneOffset.UTC));
+
+    repository.recoverGap("old-epoch", 42);
+    repository.markGap("{\"earliestSequence\":100,\"latestSequence\":200}");
+
+    assertThat(repository.state().gapDetected()).isTrue();
+    assertThat(repository.state().sourceCursor()).isEqualTo(42);
+
+    repository.recoverGap("new-epoch", 99);
+    assertThat(repository.state().gapDetected()).isFalse();
+    assertThat(repository.state().sourceCursor()).isEqualTo(99);
+  }
+
   private static List<String> filesExist(Path directory) {
     try (var stream = java.nio.file.Files.list(directory)) {
       return stream.map(path -> path.getFileName().toString()).toList();

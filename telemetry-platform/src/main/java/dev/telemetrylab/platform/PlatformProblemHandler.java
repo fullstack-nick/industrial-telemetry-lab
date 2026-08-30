@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 class PlatformProblemHandler {
@@ -32,6 +33,12 @@ class PlatformProblemHandler {
   @ExceptionHandler({IllegalArgumentException.class, MethodArgumentNotValidException.class})
   ProblemDetail invalidRequest(Exception exception, HttpServletRequest request) {
     return detail(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", exception.getMessage(), request);
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  ProblemDetail resourceNotFound(NoResourceFoundException exception, HttpServletRequest request) {
+    return detail(
+        HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "No API resource exists at this path", request);
   }
 
   @ExceptionHandler(Exception.class)

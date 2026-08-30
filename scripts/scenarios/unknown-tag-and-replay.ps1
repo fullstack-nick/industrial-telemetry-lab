@@ -17,6 +17,7 @@ try {
     Reset-SimulatorFaults
     $to = [DateTimeOffset]::UtcNow.AddMinutes(1)
     $auxBefore = [long] (Get-DatabaseScalar "SELECT COUNT(*) FROM telemetry_sample WHERE source_tag LIKE '%.TEMP_AUX_PV'")
+    $cursorBeforeReplay = [long] (Get-CollectorStatus).sourceCursor
     $token = Get-TelemetryEnvValue "LOCAL_API_TOKEN" "local-development-token-change-me"
     $headers = @{ Authorization = "Bearer $token" }
     $body = @{
@@ -41,8 +42,13 @@ try {
         return $run.status -eq "COMPLETED"
     }
     $auxAfterSecond = [long] (Get-DatabaseScalar "SELECT COUNT(*) FROM telemetry_sample WHERE source_tag LIKE '%.TEMP_AUX_PV'")
-    Assert-Condition ($auxAfterSecond -eq $auxAfterFirst) "repeating replay creates no duplicate canonical samples"
+    $secondDuplicateCount = [long] (Get-DatabaseScalar "SELECT duplicate_count FROM replay_run WHERE replay_id='$($second.replayId)'")
+    Assert-Condition ($secondDuplicateCount -gt 0) "repeat replay recognizes already-canonical observations as duplicates"
+    $duplicateCanonicalRows = [long] (Get-DatabaseScalar "SELECT COUNT(*) - COUNT(DISTINCT observation_id) FROM telemetry_sample WHERE source_tag LIKE '%.TEMP_AUX_PV'")
+    Assert-Condition ($duplicateCanonicalRows -eq 0) "repeating replay creates no duplicate canonical samples"
+    Assert-Condition ([long] (Get-CollectorStatus).sourceCursor -gt $cursorBeforeReplay) "live source acquisition continues while replay work is processed"
     Write-Host "Recovered auxiliary samples: $($auxAfterFirst - $auxBefore)"
+    Write-Host "Additional unique auxiliary samples found by repeat replay: $($auxAfterSecond - $auxAfterFirst)"
     Write-ScenarioPass "unknown-tag-and-replay"
 } finally {
     try { Reset-SimulatorFaults } catch {}

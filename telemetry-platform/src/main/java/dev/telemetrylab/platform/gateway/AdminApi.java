@@ -1,11 +1,13 @@
 package dev.telemetrylab.platform.gateway;
 
 import dev.telemetrylab.platform.LocalAuthorization;
+import dev.telemetrylab.platform.messaging.OutboxRuntimeControl;
 import dev.telemetrylab.platform.store.RawObjectStore;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpHeaders;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -27,16 +29,19 @@ class AdminApi {
   private final GatewayRuntimeControl runtimeControl;
   private final RawObjectStore rawObjectStore;
   private final JdbcTemplate jdbc;
+  private final OutboxRuntimeControl outboxRuntimeControl;
 
   AdminApi(
       LocalAuthorization authorization,
       GatewayRuntimeControl runtimeControl,
       RawObjectStore rawObjectStore,
-      JdbcTemplate jdbc) {
+      JdbcTemplate jdbc,
+      OutboxRuntimeControl outboxRuntimeControl) {
     this.authorization = authorization;
     this.runtimeControl = runtimeControl;
     this.rawObjectStore = rawObjectStore;
     this.jdbc = jdbc;
+    this.outboxRuntimeControl = outboxRuntimeControl;
   }
 
   @PutMapping("/overload")
@@ -45,6 +50,15 @@ class AdminApi {
       @RequestBody OverloadRequest request) {
     authorization.require(bearer);
     return Map.of("overloaded", runtimeControl.setOverloaded(request.overloaded()));
+  }
+
+  @PutMapping("/faults/outbox-confirm-gap")
+  Map<String, Boolean> outboxConfirmGap(
+      @RequestHeader(name = HttpHeaders.AUTHORIZATION, required = false) String bearer,
+      @RequestBody OutboxConfirmGapRequest request) {
+    authorization.require(bearer);
+    return Map.of(
+        "armed", outboxRuntimeControl.armConfirmCommitGap(request.armed(), request.batchId()));
   }
 
   @GetMapping("/raw-objects/reconciliation")
@@ -71,4 +85,6 @@ class AdminApi {
   }
 
   record OverloadRequest(boolean overloaded) {}
+
+  record OutboxConfirmGapRequest(boolean armed, UUID batchId) {}
 }

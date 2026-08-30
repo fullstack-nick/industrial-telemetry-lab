@@ -20,9 +20,10 @@ spool_grew() { [[ "$(collector_status | json_number spoolObservationCount)" -gt 
 wait_until 'collector buffers readings while the gateway is down' 35 spool_grew
 during="$(collector_status)"
 during_cursor="$(printf '%s' "$during" | json_number sourceCursor)"
-pending="$(printf '%s' "$during" | json_number pendingBatchCount)"
 assert_true 'source polling continues during the gateway outage' test "$during_cursor" -gt "$before_cursor"
-assert_true 'at least one exact compressed batch remains pending' test "$pending" -gt 0
+batch_pending() { [[ "$(collector_status | json_number pendingBatchCount)" -gt 0 ]]; }
+wait_until 'at least one exact compressed batch remains pending' 20 batch_pending
+during="$(collector_status)"
 printf 'Spool before outage: %s\n' "$before_spool"
 printf 'Spool during outage: %s\n' "$(printf '%s' "$during" | json_number spoolObservationCount)"
 compose start telemetry-gateway

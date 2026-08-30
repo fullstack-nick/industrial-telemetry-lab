@@ -38,6 +38,7 @@ public class CollectorPipeline {
   private final Clock clock;
   private final RetryPolicy retryPolicy;
   private final MeterRegistry meterRegistry;
+  private final SpoolWatermarks watermarks;
   private final AtomicBoolean sourceConnected = new AtomicBoolean();
   private final AtomicReference<Instant> lastSuccessfulUpload = new AtomicReference<>();
   private final AtomicLong gapCount = new AtomicLong();
@@ -59,6 +60,11 @@ public class CollectorPipeline {
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.meterRegistry = meterRegistry;
+    this.watermarks =
+        new SpoolWatermarks(
+            properties.spoolMaxRows(),
+            properties.highWatermarkPercent(),
+            properties.lowWatermarkPercent());
     this.retryPolicy =
         new RetryPolicy(Duration.ofSeconds(1), Duration.ofMinutes(2), ThreadLocalRandom.current());
     this.observationsReceived = meterRegistry.counter("edge_source_observations_received_total");
@@ -79,16 +85,14 @@ public class CollectorPipeline {
       return;
     }
     long count = repository.unacknowledgedCount();
-    long high = threshold(properties.highWatermarkPercent());
-    long low = threshold(properties.lowWatermarkPercent());
-    if (state.pollingPaused() && count > low) {
+    if (state.pollingPaused() && watermarks.remainPaused(count)) {
       return;
     }
     if (state.pollingPaused()) {
       repository.setPollingPaused(false);
       LOGGER.info("Collector polling resumed below the low-water mark");
     }
-    if (count >= high || count + properties.pollLimit() > properties.spoolMaxRows()) {
+    if (watermarks.shouldPause(count, properties.pollLimit())) {
       repository.setPollingPaused(true);
       LOGGER.warn("Collector polling paused at the spool high-water mark; spoolRows={}", count);
       return;
@@ -265,10 +269,6 @@ public class CollectorPipeline {
       repository.markGap("Cursor expired, but response details could not be parsed");
       LOGGER.error("Source cursor expired and response parsing failed", parseFailure);
     }
-  }
-
-  private long threshold(int percent) {
-    return Math.round(properties.spoolMaxRows() * (percent / 100.0));
   }
 
   private void registerGauges(MeterRegistry registry) {

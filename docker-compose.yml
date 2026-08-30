@@ -22,7 +22,7 @@ x-application-common: &application-common
 
 services:
   storage-init:
-    image: eclipse-temurin:21.0.8_9-jre-jammy
+    image: eclipse-temurin:21.0.8_9-jre-jammy@sha256:db1689535962d757a5adabf57387584ed543d38c0b9d1fe870123ea362ad73b0
     restart: no
     read_only: true
     network_mode: none
@@ -36,7 +36,7 @@ services:
       - application_logs:/logs
 
   timescaledb:
-    image: timescale/timescaledb:2.29.2-pg17
+    image: timescale/timescaledb:2.29.2-pg17@sha256:bc8527e62f70f0766b29515077965025872fabb5349db421565f69ee273baf2d
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -55,7 +55,7 @@ services:
       - telemetry
 
   rabbitmq:
-    image: rabbitmq:4.3.5-management
+    image: rabbitmq:4.3.5-management@sha256:45226f38499559b9f56875c752cc6689ff90e8f20796fe80fd9bc28d64723031
     restart: unless-stopped
     environment:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
@@ -75,7 +75,7 @@ services:
       - telemetry
 
   seaweedfs:
-    image: chrislusf/seaweedfs:4.44
+    image: chrislusf/seaweedfs:4.44@sha256:e67e8c385484120b78bff47ba5f4debbca47fbd27ed1a39f016f47e8baea615b
     restart: unless-stopped
     command: [mini, -dir=/data]
     environment:
@@ -262,7 +262,7 @@ services:
       retries: 30
 
   prometheus:
-    image: prom/prometheus:v3.14.0
+    image: prom/prometheus:v3.14.0@sha256:5ce7540c3c00ef4ab0c9d2c995c6a5b9c421f44b4a115d97a2c7af3b1c21cbb0
     profiles: [observability]
     restart: unless-stopped
     read_only: true
@@ -281,7 +281,7 @@ services:
       - telemetry
 
   observability-storage-init:
-    image: eclipse-temurin:21.0.8_9-jre-jammy
+    image: eclipse-temurin:21.0.8_9-jre-jammy@sha256:db1689535962d757a5adabf57387584ed543d38c0b9d1fe870123ea362ad73b0
     profiles: [observability]
     restart: no
     read_only: true
@@ -302,7 +302,7 @@ services:
       - tempo_data:/tempo
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.159.0
+    image: otel/opentelemetry-collector-contrib:0.159.0@sha256:1f2c54a30e713fac6b3ae77a1ec84010c2007e29ced8ec666214fc2f6739c1cc
     profiles: [observability]
     restart: unless-stopped
     read_only: true
@@ -315,7 +315,7 @@ services:
       - telemetry
 
   tempo:
-    image: grafana/tempo:3.0.3
+    image: grafana/tempo:3.0.3@sha256:0296560ac66f8a3600d7fb3014a52c189d4d9c3549ad6ff441bf2409855d68d5
     profiles: [observability]
     restart: unless-stopped
     read_only: true
@@ -333,7 +333,7 @@ services:
       - telemetry
 
   loki:
-    image: grafana/loki:3.7.7
+    image: grafana/loki:3.7.7@sha256:d70e4659623f3e109af669cae76fe2a5dd5be54e2298fe8aed380d982fbc2500
     profiles: [observability]
     restart: unless-stopped
     read_only: true
@@ -351,7 +351,7 @@ services:
       - telemetry
 
   alloy:
-    image: grafana/alloy:v1.19.2
+    image: grafana/alloy:v1.19.2@sha256:b8ec653c44235fbe910879145dac3597d66b0aaecf60bcbbe82580767771a839
     profiles: [observability]
     restart: unless-stopped
     read_only: true
@@ -375,7 +375,7 @@ services:
       - telemetry
 
   grafana:
-    image: grafana/grafana:13.2.0
+    image: grafana/grafana:13.2.0@sha256:3fd54ae1214669f8355f065ec9f6445d5279a3d77095ab048ca045685272429b
     profiles: [observability]
     restart: unless-stopped
     read_only: true

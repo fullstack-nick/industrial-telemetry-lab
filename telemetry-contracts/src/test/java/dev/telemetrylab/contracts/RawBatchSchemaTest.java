@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
@@ -56,6 +57,39 @@ class RawBatchSchemaTest {
     JsonNode changed = valid.deepCopy();
     ((com.fasterxml.jackson.databind.node.ObjectNode) changed.get("observations").get(0))
         .put("rawValue", "not-a-number");
+
+    assertThat(schema.validate(changed)).isNotEmpty();
+  }
+
+  @Test
+  void unsupportedContractVersionFails() {
+    JsonNode changed = valid.deepCopy();
+    ((com.fasterxml.jackson.databind.node.ObjectNode) changed)
+        .put("contractVersion", "raw-observation.batch.v2");
+
+    assertThat(schema.validate(changed)).isNotEmpty();
+  }
+
+  @Test
+  void invalidTimestampCannotBeDeserializedIntoTheContract() {
+    JsonNode changed = valid.deepCopy();
+    ((com.fasterxml.jackson.databind.node.ObjectNode) changed.get("observations").get(0))
+        .put("observedAt", "not-a-timestamp");
+
+    assertThat(
+            org.assertj.core.api.Assertions.catchThrowable(
+                () -> MAPPER.treeToValue(changed, RawObservationBatch.class)))
+        .isNotNull();
+  }
+
+  @Test
+  void batchSizeLimitIsEnforced() {
+    JsonNode changed = valid.deepCopy();
+    ArrayNode observations = (ArrayNode) changed.get("observations");
+    JsonNode template = observations.get(0).deepCopy();
+    while (observations.size() <= 500) {
+      observations.add(template.deepCopy());
+    }
 
     assertThat(schema.validate(changed)).isNotEmpty();
   }

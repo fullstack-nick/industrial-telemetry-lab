@@ -84,9 +84,27 @@ public class S3RawObjectStore implements RawObjectStore {
   }
 
   @Override
+  @WithSpan("raw_object_store.find_by_batch_id")
   public Optional<StoredObjectMetadata> findByBatchId(String batchId) {
+    ensureBucket();
     String suffix = "batch=" + batchId + ".json.gz";
-    return list().stream().filter(item -> item.objectKey().endsWith(suffix)).findFirst();
+    String continuation = null;
+    do {
+      var response =
+          client.listObjectsV2(
+              ListObjectsV2Request.builder()
+                  .bucket(bucket)
+                  .prefix("raw-observations/")
+                  .continuationToken(continuation)
+                  .build());
+      for (S3Object object : response.contents()) {
+        if (object.key().endsWith(suffix)) {
+          return head(object.key());
+        }
+      }
+      continuation = response.isTruncated() ? response.nextContinuationToken() : null;
+    } while (continuation != null);
+    return Optional.empty();
   }
 
   @Override

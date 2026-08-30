@@ -19,7 +19,8 @@ before="$(collector_status)"
 before_epoch="$(sed -nE 's/.*"sourceEpoch":"([^"]+)".*/\1/p' <<<"$before")"
 before_cursor="$(printf '%s' "$before" | json_number sourceCursor)"
 before_spool="$(printf '%s' "$before" | json_number spoolObservationCount)"
-compose restart edge-collector
+compose kill edge-collector
+compose up -d --no-deps edge-collector
 wait_http http://localhost:8082/actuator/health/readiness
 after="$(collector_status)"
 after_epoch="$(sed -nE 's/.*"sourceEpoch":"([^"]+)".*/\1/p' <<<"$after")"

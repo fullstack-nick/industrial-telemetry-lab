@@ -17,7 +17,10 @@ try {
     }
     $during = Get-CollectorStatus
     Assert-Condition ([long] $during.sourceCursor -gt [long] $before.sourceCursor) "source polling continues during the gateway outage"
-    Assert-Condition ([long] $during.pendingBatchCount -gt 0) "at least one exact compressed batch remains pending"
+    Wait-ForCondition -Description "at least one exact compressed batch remains pending" -TimeoutSeconds 20 -Condition {
+        return [long] (Get-CollectorStatus).pendingBatchCount -gt 0
+    }
+    $during = Get-CollectorStatus
     Write-Host "Spool before outage: $($before.spoolObservationCount)"
     Write-Host "Spool during outage: $($during.spoolObservationCount)"
 

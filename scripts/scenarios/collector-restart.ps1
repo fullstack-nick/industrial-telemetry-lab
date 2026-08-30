@@ -14,7 +14,8 @@ try {
         return [long] (Get-CollectorStatus).spoolObservationCount -gt 0
     }
     $before = Get-CollectorStatus
-    Invoke-TelemetryCompose @("restart", "edge-collector")
+    Invoke-TelemetryCompose @("kill", "edge-collector")
+    Invoke-TelemetryCompose @("up", "-d", "--no-deps", "edge-collector")
     Wait-TelemetryHttp "http://localhost:8082/actuator/health/readiness"
     $after = Get-CollectorStatus
     Assert-Condition ($after.sourceEpoch -eq $before.sourceEpoch) "source epoch survives collector restart"

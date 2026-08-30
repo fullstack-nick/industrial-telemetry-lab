@@ -2,6 +2,10 @@ package dev.telemetrylab.platform.messaging;
 
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opentelemetry.api.GlobalOpenTelemetry;
+import io.opentelemetry.context.Context;
+import io.opentelemetry.context.Scope;
+import io.opentelemetry.context.propagation.TextMapGetter;
 import io.opentelemetry.instrumentation.annotations.WithSpan;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -16,6 +20,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
@@ -25,24 +30,39 @@ import org.springframework.transaction.support.TransactionTemplate;
     matchIfMissing = true)
 class OutboxPublisher {
   private static final Logger LOGGER = LoggerFactory.getLogger(OutboxPublisher.class);
+  private static final TextMapGetter<Map<String, String>> TRACE_CONTEXT_GETTER =
+      new TextMapGetter<>() {
+        @Override
+        public Iterable<String> keys(Map<String, String> carrier) {
+          return carrier.keySet();
+        }
+
+        @Override
+        public String get(Map<String, String> carrier, String key) {
+          return carrier.get(key);
+        }
+      };
 
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transactions;
   private final ConfirmedPublisher publisher;
   private final Clock clock;
   private final MeterRegistry meterRegistry;
+  private final OutboxRuntimeControl runtimeControl;
 
   OutboxPublisher(
       JdbcTemplate jdbc,
       TransactionTemplate transactions,
       ConfirmedPublisher publisher,
       Clock clock,
-      MeterRegistry meterRegistry) {
+      MeterRegistry meterRegistry,
+      OutboxRuntimeControl runtimeControl) {
     this.jdbc = jdbc;
     this.transactions = transactions;
     this.publisher = publisher;
     this.clock = clock;
     this.meterRegistry = meterRegistry;
+    this.runtimeControl = runtimeControl;
     Gauge.builder("outbox_unpublished_events", this, OutboxPublisher::safeCount)
         .register(meterRegistry);
     Gauge.builder("outbox_oldest_unpublished_age_seconds", this, OutboxPublisher::safeOldestAge)
@@ -50,14 +70,13 @@ class OutboxPublisher {
   }
 
   @Scheduled(fixedDelayString = "${telemetry.outbox.publish-delay-ms:250}")
-  @WithSpan("gateway.outbox.publish")
   void publishNext() {
     transactions.executeWithoutResult(
         status -> {
           List<OutboxRecord> rows =
               jdbc.query(
                   """
-                  SELECT event_id, payload::text AS payload, trace_parent, attempt_count
+                  SELECT event_id, batch_id, payload::text AS payload, trace_parent, attempt_count
                   FROM outbox_event
                   WHERE published_at IS NULL AND next_attempt_at <= now()
                   ORDER BY created_at
@@ -67,6 +86,7 @@ class OutboxPublisher {
                   (result, row) ->
                       new OutboxRecord(
                           result.getObject("event_id", UUID.class),
+                          result.getObject("batch_id", UUID.class),
                           result.getString("payload"),
                           result.getString("trace_parent"),
                           result.getInt("attempt_count")));
@@ -74,40 +94,67 @@ class OutboxPublisher {
             return;
           }
           OutboxRecord record = rows.getFirst();
+          Scope scope = storedTraceContext(record.traceParent()).makeCurrent();
           try {
-            Map<String, Object> headers = new HashMap<>();
-            if (record.traceParent() != null && !record.traceParent().isBlank()) {
-              headers.put("traceparent", record.traceParent());
-            }
-            headers.put("x-processing-attempt", 0);
-            publisher.publish(
-                RabbitTopology.MAIN, record.payload(), headers, Duration.ofSeconds(10));
-            jdbc.update(
-                "UPDATE outbox_event SET published_at=?, attempt_count=attempt_count+1,"
-                    + " last_error=NULL WHERE event_id=?",
-                Timestamp.from(clock.instant()),
-                record.eventId());
-            meterRegistry.counter("outbox_publish_total", "result", "success").increment();
-          } catch (RuntimeException exception) {
-            int attempts = record.attemptCount() + 1;
-            long delaySeconds = Math.min(60, 1L << Math.min(attempts, 6));
-            jdbc.update(
-                """
-                UPDATE outbox_event
-                SET attempt_count=attempt_count+1, next_attempt_at=?, last_error=?
-                WHERE event_id=?
-                """,
-                Timestamp.from(clock.instant().plusSeconds(delaySeconds)),
-                truncate(exception.toString()),
-                record.eventId());
-            meterRegistry.counter("outbox_publish_total", "result", "failure").increment();
-            LOGGER.warn(
-                "Outbox publish failed and remains pending; eventId={} attempt={} errorType={}",
-                record.eventId(),
-                attempts,
-                exception.getClass().getSimpleName());
+            publishRecord(status, record);
+          } finally {
+            scope.close();
           }
         });
+  }
+
+  @WithSpan("gateway.outbox.publish")
+  void publishRecord(TransactionStatus status, OutboxRecord record) {
+    try {
+      Map<String, Object> headers = new HashMap<>();
+      if (record.traceParent() != null && !record.traceParent().isBlank()) {
+        headers.put("traceparent", record.traceParent());
+      }
+      headers.put("x-processing-attempt", 0);
+      publisher.publish(RabbitTopology.MAIN, record.payload(), headers, Duration.ofSeconds(10));
+      if (runtimeControl.consumeConfirmCommitGap(record.batchId())) {
+        status.setRollbackOnly();
+        meterRegistry.counter("outbox_publish_total", "result", "confirm_gap_injected").increment();
+        LOGGER.warn(
+            "Injected outbox crash window after broker confirmation; event remains"
+                + " unpublished; eventId={}",
+            record.eventId());
+        return;
+      }
+      jdbc.update(
+          "UPDATE outbox_event SET published_at=?, attempt_count=attempt_count+1,"
+              + " last_error=NULL WHERE event_id=?",
+          Timestamp.from(clock.instant()),
+          record.eventId());
+      meterRegistry.counter("outbox_publish_total", "result", "success").increment();
+    } catch (RuntimeException exception) {
+      int attempts = record.attemptCount() + 1;
+      long delaySeconds = Math.min(60, 1L << Math.min(attempts, 6));
+      jdbc.update(
+          """
+          UPDATE outbox_event
+          SET attempt_count=attempt_count+1, next_attempt_at=?, last_error=?
+          WHERE event_id=?
+          """,
+          Timestamp.from(clock.instant().plusSeconds(delaySeconds)),
+          truncate(exception.toString()),
+          record.eventId());
+      meterRegistry.counter("outbox_publish_total", "result", "failure").increment();
+      LOGGER.warn(
+          "Outbox publish failed and remains pending; eventId={} attempt={} errorType={}",
+          record.eventId(),
+          attempts,
+          exception.getClass().getSimpleName());
+    }
+  }
+
+  private static Context storedTraceContext(String traceParent) {
+    if (traceParent == null || traceParent.isBlank()) {
+      return Context.root();
+    }
+    return GlobalOpenTelemetry.getPropagators()
+        .getTextMapPropagator()
+        .extract(Context.root(), Map.of("traceparent", traceParent), TRACE_CONTEXT_GETTER);
   }
 
   private double safeCount() {
@@ -139,5 +186,6 @@ class OutboxPublisher {
     return value.length() <= 1000 ? value : value.substring(0, 1000);
   }
 
-  private record OutboxRecord(UUID eventId, String payload, String traceParent, int attemptCount) {}
+  private record OutboxRecord(
+      UUID eventId, UUID batchId, String payload, String traceParent, int attemptCount) {}
 }

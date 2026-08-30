@@ -15,7 +15,7 @@ trap cleanup EXIT
 printf 'Building and starting the core telemetry stack...\n'
 compose up -d --build
 wait_core_stack
-for scenario in normal-operation gateway-outage collector-restart worker-backlog database-outage duplicate-delivery invalid-unit unknown-tag-and-replay; do
+for scenario in normal-operation ingestion-boundaries gateway-outage collector-restart worker-backlog database-outage duplicate-delivery invalid-unit unknown-tag-and-replay; do
   "$script_dir/scenarios/$scenario.sh" "$TELEMETRY_ENV_FILE"
 done
-printf 'All eight end-to-end scenarios passed.\n'
+printf 'All nine end-to-end scenarios passed.\n'
